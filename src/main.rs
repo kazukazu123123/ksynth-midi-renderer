@@ -172,11 +172,16 @@ fn main() {
 
     if !headless {
         println!("Creating Samples HashMap...");
+    } else {
+        println!("creating_samples_hashmap");
     }
     let mut samples_map: HashMap<u8, Sample> = HashMap::with_capacity(128);
     if !headless {
         println!("Samples HashMap Created!");
         println!("Loading sample...");
+    } else {
+        println!("created_samples_hashmap");
+        println!("loading_sample");
     }
 
     // Precalculate sample
@@ -202,7 +207,11 @@ fn main() {
     if !headless {
         println!("Sample Loaded!");
         println!("Creating KSynth...");
+    } else {
+        println!("sample_loaded");
+        println!("creating_ksynth");
     }
+
     let samples_arc = Arc::new(RwLock::new(samples_map));
     let mut multi_synth = MultiSynth::new(
         sample_rate,
@@ -214,6 +223,8 @@ fn main() {
     );
     if !headless {
         println!("KSynth Ready!");
+        } else {
+        println!("ksynth_ready");
     }
 
     // MIDIファイルのパスを取得（引数で指定されていない場合はファイルダイアログを表示）
