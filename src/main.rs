@@ -125,13 +125,7 @@ fn main() {
 
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
-        eprintln!("Error: MIDI file path must be specified in headless mode");
-        eprintln!(
-            "Usage: {} --headless --midi-file-path <path>",
-            std::env::args()
-                .next()
-                .unwrap_or_else(|| "program".to_string())
-        );
+        eprintln!("error: MIDI file path must be specified in headless mode");
         return;
     }
 
@@ -143,11 +137,11 @@ fn main() {
     // 設定を表示
     if headless {
         // Machine-readable format
-        println!("sample_rate={}", sample_rate);
-        println!("channels={}", num_channel);
-        println!("max_polyphony={}", max_polyphony);
-        println!("thread_count={}", thread_count);
-        println!("log_interval_ms={}", args.log_interval_ms);
+        eprintln!("sample_rate={}", sample_rate);
+        eprintln!("channels={}", num_channel);
+        eprintln!("max_polyphony={}", max_polyphony);
+        eprintln!("thread_count={}", thread_count);
+        eprintln!("log_interval_ms={}", args.log_interval_ms);
     } else {
         println!("Sample Rate: {} Hz", format_number(sample_rate as u64));
         println!("Channels: {}", num_channel);
@@ -173,15 +167,15 @@ fn main() {
     if !headless {
         println!("Creating Samples HashMap...");
     } else {
-        println!("creating_samples_hashmap");
+        eprintln!("creating_samples_hashmap");
     }
     let mut samples_map: HashMap<u8, Sample> = HashMap::with_capacity(128);
     if !headless {
         println!("Samples HashMap Created!");
         println!("Loading sample...");
     } else {
-        println!("created_samples_hashmap");
-        println!("loading_sample");
+        eprintln!("created_samples_hashmap");
+        eprintln!("loading_sample");
     }
 
     // Precalculate sample
@@ -208,8 +202,8 @@ fn main() {
         println!("Sample Loaded!");
         println!("Creating KSynth...");
     } else {
-        println!("sample_loaded");
-        println!("creating_ksynth");
+        eprintln!("sample_loaded");
+        eprintln!("creating_ksynth");
     }
 
     let samples_arc = Arc::new(RwLock::new(samples_map));
@@ -223,8 +217,8 @@ fn main() {
     );
     if !headless {
         println!("KSynth Ready!");
-        } else {
-        println!("ksynth_ready");
+    } else {
+        eprintln!("ksynth_ready");
     }
 
     // MIDIファイルのパスを取得（引数で指定されていない場合はファイルダイアログを表示）
@@ -277,12 +271,14 @@ fn main() {
         .to_string();
 
     if headless {
-        println!("midi_file={}", midi_file_name);
+        eprintln!("loading_midi_file={}", midi_file_name);
     } else {
         println!("Loading MIDI: {}", midi_file_name);
     }
     let midi = MIDIFile::open(midi_path, None).expect("Failed to open midi file!");
-    if !headless {
+    if headless {
+        eprintln!("midi_loaded");
+    } else {
         println!("MIDI Loaded!");
     }
 
@@ -301,7 +297,10 @@ fn main() {
 
     if !headless {
         println!("Calculating MIDI Statistics");
+    } else {
+        eprintln!("calculating_mmidi_statistics");
     }
+
     let statistics = pipe!(
         midi.iter_all_tracks()
         |>to_vec()
@@ -312,10 +311,16 @@ fn main() {
     let note_count = statistics.note_count();
     drop(statistics);
 
+    if !headless {
+        println!("Calculated MIDI Statistics");
+    } else {
+        eprintln!("calculated_mmidi_statistics");
+    }
+
     let total_frames = (midi_duration.as_secs_f64() * sample_rate as f64).ceil() as u64;
     if headless {
-        println!("midi_duration_sec={:.2}", midi_duration.as_secs_f64());
-        println!("note_count={}", note_count);
+        eprintln!("midi_duration_sec={:.2}", midi_duration.as_secs_f64());
+        eprintln!("note_count={}", note_count);
     } else {
         println!("MIDI Statistics Calculated!");
         println!("MIDI Duration: {}", format_duration(midi_duration, false));
@@ -348,14 +353,27 @@ fn main() {
         sample_format: hound::SampleFormat::Float,
     };
 
-    let mut writer =
-        hound::WavWriter::create(format!("{}.wav", midi_file_name_without_extension), spec)
-            .unwrap();
+    let mut writer = if headless {
+        None
+    } else {
+        Some(
+            hound::WavWriter::create(format!("{}.wav", midi_file_name_without_extension), spec)
+                .unwrap(),
+        )
+    };
+
+    let stdout = if headless {
+        Some(std::io::stdout())
+    } else {
+        None
+    };
+    let mut stdout_lock = stdout.as_ref().map(|s| s.lock());
+
     if !headless {
         println!("Audio Encoder Created!");
         println!("Rendering Started");
     } else {
-        println!("rendering_started")
+        eprintln!("rendering_started")
     }
 
     let rendering_start_time = Instant::now();
@@ -385,9 +403,14 @@ fn main() {
 
             for frame in synth_buffer.chunks_exact(num_channel as usize) {
                 for &sample in frame {
-                    writer
-                        .write_sample(sample)
-                        .expect("Failed to write sample!");
+                    if let Some(ref mut w) = writer {
+                        w.write_sample(sample).expect("Failed to write sample!");
+                    } else if let Some(ref mut out) = stdout_lock {
+                        use std::io::Write;
+                        out.write_all(&sample.to_le_bytes())
+                            .expect("Failed to write PCM!");
+                        out.flush().expect("Failed to flush!");
+                    }
                 }
             }
 
@@ -428,7 +451,7 @@ fn main() {
             ));
         } else if headless && headless_last_report_time.elapsed() >= headless_report_interval {
             // Headless mode: key=value format for consistency
-            println!(
+            eprintln!(
                 "progress: current_sec={:.2} total_sec={:.2} percent={:.1} active_voices={} max_voices={} peak_voices={} rt_percent={:.2}",
                 current_time.as_secs_f64(),
                 midi_duration.as_secs_f64(),
@@ -457,13 +480,20 @@ fn main() {
 
     for frame in synth_buffer.chunks_exact(num_channel as usize) {
         for &sample in frame {
-            writer
-                .write_sample(sample)
-                .expect("Failed to write sample!");
+            if let Some(ref mut w) = writer {
+                w.write_sample(sample).expect("Failed to write sample!");
+            } else if let Some(ref mut out) = stdout_lock {
+                use std::io::Write;
+                out.write_all(&sample.to_le_bytes())
+                    .expect("Failed to write PCM!");
+                out.flush().expect("Failed to flush!");
+            }
         }
     }
 
-    writer.finalize().expect("Failed to finalize!");
+    if let Some(w) = writer {
+        w.finalize().expect("Failed to finalize!");
+    }
 
     let rendering_end_time = Instant::now();
 
@@ -473,7 +503,7 @@ fn main() {
         pb.finish();
     } else if headless {
         // Final progress line
-        println!(
+        eprintln!(
             "progress: current_sec={:.2} total_sec={:.2} percent=100.0 active_voices=0 max_voices={} peak_voices={} rt_percent=0.00",
             midi_duration.as_secs_f64(),
             midi_duration.as_secs_f64(),
@@ -482,12 +512,12 @@ fn main() {
         );
     }
     if headless {
-        println!("rendering_finished");
-        println!(
+        eprintln!("rendering_finished");
+        eprintln!(
             "rendering_time_sec={:.2}",
             rendering_took_time.as_secs_f64()
         );
-        println!(
+        eprintln!(
             "realtime_ratio={:.2}",
             midi_duration.as_secs_f64() / rendering_took_time.as_secs_f64()
         );
