@@ -298,7 +298,7 @@ fn main() {
     if !headless {
         println!("Calculating MIDI Statistics");
     } else {
-        eprintln!("calculating_mmidi_statistics");
+        eprintln!("calculating_midi_statistics");
     }
 
     let statistics = pipe!(
@@ -314,7 +314,7 @@ fn main() {
     if !headless {
         println!("Calculated MIDI Statistics");
     } else {
-        eprintln!("calculated_mmidi_statistics");
+        eprintln!("calculated_midi_statistics");
     }
 
     let total_frames = (midi_duration.as_secs_f64() * sample_rate as f64).ceil() as u64;
