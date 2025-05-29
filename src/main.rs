@@ -125,7 +125,7 @@ fn main() {
 
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
-        eprintln!("error: MIDI file path must be specified in headless mode");
+        eprintln!("error MIDI file path must be specified in headless mode");
         return;
     }
 
@@ -234,7 +234,7 @@ fn main() {
         None => {
             // ヘッドレスモードではファイルダイアログを表示できない
             if headless {
-                eprintln!("Error: MIDI file path must be specified in headless mode");
+                eprintln!("error MIDI file path must be specified in headless mode");
                 eprintln!(
                     "Usage: {} --headless --midi-file-path <path>",
                     std::env::args()
@@ -452,7 +452,7 @@ fn main() {
         } else if headless && headless_last_report_time.elapsed() >= headless_report_interval {
             // Headless mode: key=value format for consistency
             eprintln!(
-                "progress: current_sec={:.2} total_sec={:.2} percent={:.1} active_voices={} max_voices={} peak_voices={} rt_percent={:.2}",
+                "progress current_sec={:.2} total_sec={:.2} percent={:.1} active_voices={} max_voices={} peak_voices={} rt_percent={:.2}",
                 current_time.as_secs_f64(),
                 midi_duration.as_secs_f64(),
                 (current_time.as_secs_f64() / midi_duration.as_secs_f64()) * 100.0,
@@ -504,7 +504,7 @@ fn main() {
     } else if headless {
         // Final progress line
         eprintln!(
-            "progress: current_sec={:.2} total_sec={:.2} percent=100.0 active_voices=0 max_voices={} peak_voices={} rt_percent=0.00",
+            "progress current_sec={:.2} total_sec={:.2} percent=100.0 active_voices=0 max_voices={} peak_voices={} rt_percent=0.00",
             midi_duration.as_secs_f64(),
             midi_duration.as_secs_f64(),
             max_polyphony,
