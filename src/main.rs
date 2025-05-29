@@ -226,24 +226,16 @@ fn main() {
         Some(path) => {
             // パスが存在するか確認
             if !std::path::Path::new(&path).exists() {
-                eprintln!("Error: MIDI file not found: {}", path);
+                if headless {
+                    eprintln!("error MIDI file not found: {}", path);
+                } else {
+                    eprintln!("Error: MIDI file not found: {}", path);
+                }
                 return;
             }
             path
         }
         None => {
-            // ヘッドレスモードではファイルダイアログを表示できない
-            if headless {
-                eprintln!("error MIDI file path must be specified in headless mode");
-                eprintln!(
-                    "Usage: {} --headless --midi-file-path <path>",
-                    std::env::args()
-                        .next()
-                        .unwrap_or_else(|| "program".to_string())
-                );
-                return;
-            }
-
             // ファイルダイアログを表示
             let midi_file = FileDialog::new()
                 .add_filter("MIDI File", &["mid", "midi"])
