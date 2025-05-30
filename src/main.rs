@@ -126,7 +126,7 @@ fn main() {
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
         eprintln!("error MIDI file path must be specified in headless mode");
-        return;
+        std::process::exit(1);
     }
 
     if !headless {
@@ -228,10 +228,11 @@ fn main() {
             if !std::path::Path::new(&path).exists() {
                 if headless {
                     eprintln!("error MIDI file not found: {}", path);
+                    std::process::exit(1);
                 } else {
                     eprintln!("Error: MIDI file not found: {}", path);
+                    std::process::exit(1);
                 }
-                return;
             }
             path
         }
