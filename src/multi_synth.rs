@@ -35,24 +35,29 @@ impl MultiSynth {
             max_voices[i as usize] += 1;
         }
 
-        let synths = max_voices
-            .iter()
-            .map(|&voices| {
-                KSynth::new(
+        let mut synths = Vec::with_capacity(num_instances);
+        let mut filtered_max_voices = Vec::new();
+
+        for &voices in &max_voices {
+            if voices > 0 {
+                synths.push(KSynth::new(
                     sample_rate,
                     num_channel,
-                    voices as u32,
+                    voices,
                     fade_out_sample,
                     sample_map.clone(),
-                )
-            })
-            .collect();
+                ));
+                filtered_max_voices.push(voices);
+            }
+        }
+
+        let synth_len = synths.len();
 
         MultiSynth {
             synths,
             note_map: HashMap::new(),
-            note_counts: vec![0; num_instances],
-            max_voices,
+            note_counts: vec![0; synth_len],
+            max_voices: filtered_max_voices,
         }
     }
 
@@ -78,7 +83,6 @@ impl MultiSynth {
                     synth.queue_midi_cmd(cmd);
                 }
             }
-
             _ => {}
         }
     }
