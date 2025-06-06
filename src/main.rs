@@ -123,7 +123,7 @@ fn main() {
     let max_polyphony = if args.max_polyphony == 0 {
         ksynth_core::MAX_POLYPHONY
     } else {
-        args.max_polyphony as u32
+        (args.max_polyphony as u32).min(ksynth_core::MAX_POLYPHONY)
     };
 
     let thread_count = if args.thread_count == 0 {
