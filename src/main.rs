@@ -40,8 +40,16 @@ struct Args {
     #[arg(short = 'm', long)]
     midi_file_path: Option<String>,
 
+    /// Path to the sample folder (optional, if not provided, will use the default precalculated samples)
+    #[arg(short = 's', long)]
+    sample_folder_path: Option<String>,
+
+    /// Format string for sample files (e.g. "SAMPLE_{key}.wav" or "{key}.wav") (default: "{key}.wav")
+    #[arg(short = 'f', long, default_value = "{key}.wav")]
+    sample_format: String,
+
     /// Sample rate for audio rendering
-    #[arg(short = 's', long, default_value_t = 48000)]
+    #[arg(short = 'r', long, default_value_t = 48000)]
     sample_rate: u32,
 
     /// Number of audio channels (1 for mono, 2 for stereo)
@@ -107,6 +115,8 @@ fn main() {
     // コマンドライン引数を解析
     let args = Args::parse();
 
+    let sample_folder_path = args.sample_folder_path;
+
     // 引数から値を取得
     let sample_rate = args.sample_rate;
     let num_channel = args.num_channel;
@@ -142,11 +152,19 @@ fn main() {
         eprintln!("max_polyphony={}", max_polyphony);
         eprintln!("thread_count={}", thread_count);
         eprintln!("log_interval_ms={}", args.log_interval_ms);
+        eprintln!(
+            "sample_folder_path={}",
+            sample_folder_path.as_deref().unwrap_or("<NOT SET>")
+        );
     } else {
         println!("Sample Rate: {} Hz", format_number(sample_rate as u64));
         println!("Channels: {}", num_channel);
         println!("Max Polyphony: {}", format_number(max_polyphony as u64));
         println!("Thread Count: {}", format_number(thread_count as u64));
+        println!(
+            "Sample Folder Path: {}",
+            sample_folder_path.as_deref().unwrap_or("<NOT SET>")
+        );
         println!();
     }
 
@@ -178,24 +196,94 @@ fn main() {
         eprintln!("loading_sample");
     }
 
-    // Precalculate sample
-    let samples_vec: Vec<(u8, Sample)> = (0u8..128)
-        .into_par_iter()
-        .map(|key| {
-            let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
-            let sample_count = (sample_rate as f32 * 10.0) as usize;
+    if let Some(path) = &sample_folder_path {
+        if !headless {
+            println!("Loading samples from folder: {}", path);
+        } else {
+            eprintln!("loading_samples_from_folder={}", path);
+        }
+        let samples_vec: Vec<(u8, Sample)> = (0u8..128)
+            .into_par_iter()
+            .filter_map(|key| {
+                let sample_path = format!(
+                    "{}/{}",
+                    path,
+                    args.sample_format.replace("{key}", &key.to_string())
+                );
+                let file = std::fs::File::open(&sample_path).ok()?;
+                let mut reader = hound::WavReader::new(file).ok()?;
+                let spec = reader.spec();
+                let sample_rate = spec.sample_rate;
+                let channels = spec.channels;
 
-            let sample_vec: Vec<i16> = generate_piano_sample(sample_rate, freq, sample_count);
+                let sample_data = match (channels, spec.sample_format) {
+                    (1, hound::SampleFormat::Float) => {
+                        let samples = reader
+                            .samples::<f32>()
+                            .map(|s| s.unwrap() as i16)
+                            .collect::<Vec<_>>();
+                        SampleData::Mono(samples)
+                    }
+                    (1, hound::SampleFormat::Int) => {
+                        let samples = reader
+                            .samples::<i16>()
+                            .map(|s| s.unwrap())
+                            .collect::<Vec<_>>();
+                        SampleData::Mono(samples)
+                    }
+                    (2, hound::SampleFormat::Float) => {
+                        let samples = reader
+                            .samples::<f32>()
+                            .map(|s| s.unwrap() as i16)
+                            .collect::<Vec<_>>();
+                        let stereo_samples = samples
+                            .chunks_exact(2)
+                            .map(|chunk| (chunk[0], chunk[1]))
+                            .collect::<Vec<_>>();
+                        SampleData::Stereo(stereo_samples)
+                    }
+                    (2, hound::SampleFormat::Int) => {
+                        let samples = reader
+                            .samples::<i16>()
+                            .map(|s| s.unwrap())
+                            .collect::<Vec<_>>();
+                        let stereo_samples = samples
+                            .chunks_exact(2)
+                            .map(|chunk| (chunk[0], chunk[1]))
+                            .collect::<Vec<_>>();
+                        SampleData::Stereo(stereo_samples)
+                    }
+                    _ => return None,
+                };
 
-            let ksynth_sample_data = SampleData::Mono(sample_vec);
-            let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                let sample = Sample::new(sample_rate as u32, sample_data, None);
+                Some((key, sample))
+            })
+            .collect();
 
-            (key, ksynth_sample)
-        })
-        .collect();
+        for (key, sample) in samples_vec {
+            samples_map.insert(key, sample);
+        }
+    } else {
+        // Precalculate sample
+        let samples_vec: Vec<(u8, Sample)> = (0u8..128)
+            .into_par_iter()
+            .map(|key| {
+                let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                let sample_count = (sample_rate as f32 * 10.0) as usize;
 
-    for (key, sample) in samples_vec {
-        samples_map.insert(key, sample);
+                let sample_vec: Vec<i16> = generate_piano_sample(sample_rate, freq, sample_count);
+
+                let ksynth_sample_data = SampleData::Mono(sample_vec);
+                let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+
+                (key, ksynth_sample)
+            })
+            .collect();
+
+        for (key, sample) in samples_vec {
+            samples_map.insert(key, sample);
+        }
     }
 
     if !headless {
