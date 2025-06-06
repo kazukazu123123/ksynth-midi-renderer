@@ -9,7 +9,7 @@ hound = "3.5.1"
 indicatif = "0.17.11"
 ksynth-core = { git = "https://github.com/kazukazu123123/ksynth" }
 midi-toolkit-rs = { git = "https://github.com/arduano/midi-toolkit-rs" }
-num_cpus = "1.16.0"
+num_cpus = "1.17.0"
 rand = "0.9.1"
 rayon = "1.10.0"
 rfd = "0.15.3"
