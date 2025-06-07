@@ -71,6 +71,10 @@ struct Args {
     /// Log output interval in milliseconds for headless mode (default: 1000ms)
     #[arg(long, default_value_t = 1000)]
     log_interval_ms: u64,
+
+    /// Earrape noise simulation mode (like casting f32 -> s16 on C language)
+    #[arg(long)]
+    earrape_noise_mode: bool,
 }
 
 fn format_duration(duration: Duration, show_ms: bool) -> String {
@@ -132,6 +136,7 @@ fn main() {
         args.thread_count
     };
     let headless = args.headless;
+    let earrape_noise_mode = args.earrape_noise_mode;
 
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
@@ -156,6 +161,7 @@ fn main() {
             "sample_folder_path={}",
             sample_folder_path.as_deref().unwrap_or("<NOT SET>")
         );
+        eprintln!("earrape_noise_mode={}", earrape_noise_mode);
     } else {
         println!("Sample Rate: {} Hz", format_number(sample_rate as u64));
         println!("Channels: {}", num_channel);
@@ -165,6 +171,7 @@ fn main() {
             "Sample Folder Path: {}",
             sample_folder_path.as_deref().unwrap_or("<NOT SET>")
         );
+        println!("Earrape noise mode: {}", earrape_noise_mode);
         println!();
     }
 
@@ -474,11 +481,22 @@ fn main() {
             let mut synth_buffer = vec![0.0f32; frame_count * num_channel as usize];
             multi_synth.fill_buffer(synth_buffer.as_mut_slice());
 
+            if earrape_noise_mode {
+                for frame in synth_buffer.chunks_exact_mut(num_channel as usize) {
+                    for sample_f32 in frame.iter_mut() {
+                        let scaled = (*sample_f32 * 32768.0) as i32;
+
+                        let wrapped = (scaled as u16) as i16;
+
+                        *sample_f32 = (wrapped as f32) / 32768.0;
+                    }
+                }
+            }
+
             if apply_limiter {
                 for (i, limiter) in limiters.iter_mut().enumerate() {
                     let channel_samples = &mut synth_buffer[i..];
-                    let processed_samples = limiter.process(channel_samples);
-                    channel_samples.copy_from_slice(&processed_samples);
+                    limiter.process(channel_samples);
                 }
             }
 
@@ -551,11 +569,22 @@ fn main() {
     let mut synth_buffer = vec![0.0f32; frame_count * num_channel as usize];
     multi_synth.fill_buffer(synth_buffer.as_mut_slice());
 
+    if earrape_noise_mode {
+        for frame in synth_buffer.chunks_exact_mut(num_channel as usize) {
+            for sample_f32 in frame.iter_mut() {
+                let scaled = (*sample_f32 * 32768.0) as i32;
+
+                let wrapped = (scaled as u16) as i16;
+
+                *sample_f32 = (wrapped as f32) / 32768.0;
+            }
+        }
+    }
+
     if apply_limiter {
         for (i, limiter) in limiters.iter_mut().enumerate() {
             let channel_samples = &mut synth_buffer[i..];
-            let processed_samples = limiter.process(channel_samples);
-            channel_samples.copy_from_slice(&processed_samples);
+            limiter.process(channel_samples);
         }
     }
 

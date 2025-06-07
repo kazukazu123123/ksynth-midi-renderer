@@ -1853,7 +1853,7 @@ dependencies = [
 [[package]]
 name = "ksynth-core"
 version = "0.1.0"
-source = "git+https://github.com/kazukazu123123/ksynth#61fc3ee36d303eaf245abcaf2e0465ecbfaa4586"
+source = "git+https://github.com/kazukazu123123/ksynth#740c41e3d95e6e146bf42beff2ed40233ca0563a"
 dependencies = [
  "gix",
 ]
