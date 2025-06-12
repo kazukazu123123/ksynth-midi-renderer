@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.39", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 hound = "3.5.1"
 indicatif = "0.17.11"
 ksynth-core = { git = "https://github.com/kazukazu123123/ksynth" }
