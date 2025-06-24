@@ -34,7 +34,6 @@ use std::{
 
 /// MIDI to WAV renderer using KSynth
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
 struct Args {
     /// Path to the MIDI file to render (optional, will show file dialog if not provided)
     #[arg(short = 'm', long)]
