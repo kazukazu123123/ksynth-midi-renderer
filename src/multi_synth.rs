@@ -14,9 +14,9 @@ struct NoteKey {
 
 pub struct MultiSynth {
     synths: Vec<KSynth>,
-    note_map: HashMap<NoteKey, Vec<usize>>, // ノートキー → インスタンス番号リスト
-    note_counts: Vec<u32>,                  // 各インスタンスの現在同時発音数
-    max_voices: Vec<u32>,                   // 各インスタンスの最大同時発音数
+    note_map: HashMap<NoteKey, Vec<usize>>, // Note key -> list of instance indices
+    note_counts: Vec<u32>,                  // Current number of simultaneous voices per instance
+    max_voices: Vec<u32>,                   // Maximum number of simultaneous voices per instance
 }
 
 impl MultiSynth {
