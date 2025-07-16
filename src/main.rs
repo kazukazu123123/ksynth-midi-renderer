@@ -74,6 +74,10 @@ struct Args {
     /// Earrape noise simulation mode (like casting f32 -> s16 on C language)
     #[arg(long)]
     earrape_noise_mode: bool,
+
+    /// Disable limiter
+    #[arg(long)]
+    disable_limiter: bool,
 }
 
 fn format_duration(duration: Duration, show_ms: bool) -> String {
@@ -178,12 +182,17 @@ fn main() {
         .try_into()
         .expect("Failed to convert channel to KSynth Channel");
 
-    let mut limiters = [
-        Limiter::new(sample_rate as f32, 0.0, 100.0, 20.0),
-        Limiter::new(sample_rate as f32, 0.0, 100.0, 20.0),
-    ];
+    let apply_limiter = !args.disable_limiter;
 
-    let apply_limiter = true;
+    let mut limiters = if apply_limiter {
+        Some([
+            Limiter::new(sample_rate as f32, 0.0, 100.0, 20.0),
+            Limiter::new(sample_rate as f32, 0.0, 100.0, 20.0),
+        ])
+    } else {
+        None
+    };
+
     let use_multithread = true;
 
     let mut peak_polyphony = 0;
@@ -492,7 +501,7 @@ fn main() {
                 }
             }
 
-            if apply_limiter {
+            if let Some(ref mut limiters) = limiters {
                 for (i, limiter) in limiters.iter_mut().enumerate() {
                     let channel_samples = &mut synth_buffer[i..];
                     limiter.process(channel_samples);
@@ -580,7 +589,7 @@ fn main() {
         }
     }
 
-    if apply_limiter {
+    if let Some(ref mut limiters) = limiters {
         for (i, limiter) in limiters.iter_mut().enumerate() {
             let channel_samples = &mut synth_buffer[i..];
             limiter.process(channel_samples);
