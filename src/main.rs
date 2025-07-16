@@ -157,6 +157,7 @@ fn main() {
         // Machine-readable format
         eprintln!("sample_rate={}", sample_rate);
         eprintln!("channels={}", num_channel);
+        eprintln!("limiter_disabled: {}", args.disable_limiter);
         eprintln!("max_polyphony={}", max_polyphony);
         eprintln!("thread_count={}", thread_count);
         eprintln!("log_interval_ms={}", args.log_interval_ms);
@@ -168,6 +169,7 @@ fn main() {
     } else {
         println!("Sample Rate: {} Hz", format_number(sample_rate as u64));
         println!("Channels: {}", num_channel);
+        println!("Limiter Disabled: {}", args.disable_limiter);
         println!("Max Polyphony: {}", format_number(max_polyphony as u64));
         println!("Thread Count: {}", format_number(thread_count as u64));
         println!(
