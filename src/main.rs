@@ -78,6 +78,10 @@ struct Args {
     /// Disable limiter
     #[arg(long)]
     disable_limiter: bool,
+
+    /// Maximum rendering speed (0.0 for no limit, values between 0.0 and 1.0 will be treated as 1.0, 1.0 for realtime, higher values for faster rendering)
+    #[arg(long, default_value_t = 1.0)]
+    max_render_speed: f64,
 }
 
 fn format_duration(duration: Duration, show_ms: bool) -> String {
@@ -140,6 +144,11 @@ fn main() {
     };
     let headless = args.headless;
     let earrape_noise_mode = args.earrape_noise_mode;
+    let max_render_speed = if args.max_render_speed > 0.0 && args.max_render_speed < 1.0 {
+        1.0
+    } else {
+        args.max_render_speed
+    };
 
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
@@ -166,6 +175,7 @@ fn main() {
             sample_folder_path.as_deref().unwrap_or("<NOT SET>")
         );
         eprintln!("earrape_noise_mode={}", earrape_noise_mode);
+        eprintln!("max_render_speed={}", max_render_speed);
     } else {
         println!("Sample Rate: {} Hz", format_number(sample_rate as u64));
         println!("Channels: {}", num_channel);
@@ -177,6 +187,7 @@ fn main() {
             sample_folder_path.as_deref().unwrap_or("<NOT SET>")
         );
         println!("Earrape noise mode: {}", earrape_noise_mode);
+        println!("Max Render Speed: {}", max_render_speed);
         println!();
     }
 
@@ -480,6 +491,7 @@ fn main() {
     let mut headless_last_report_time = Instant::now();
     let headless_report_interval = Duration::from_millis(args.log_interval_ms);
     let mut total_rendered_frames: u64 = 0;
+    let mut actual_rendered_frames: u64 = 0;
 
     for merged_event in merge_midi() {
         time_acc += merged_event.delta * sample_rate as f64;
@@ -527,6 +539,7 @@ fn main() {
                 pb.inc(frame_count as u64);
             }
             total_rendered_frames += frame_count as u64;
+            actual_rendered_frames += frame_count as u64;
         }
 
         if let Some(event_u32) = merged_event.event.as_u32() {
@@ -546,6 +559,15 @@ fn main() {
 
         if active_polyphony > peak_polyphony {
             peak_polyphony = active_polyphony;
+        }
+
+        if max_render_speed > 0.0 {
+            let expected_elapsed = Duration::from_secs_f64(actual_rendered_frames as f64 / (sample_rate as f64 * max_render_speed));
+            let actual_elapsed = rendering_start_time.elapsed();
+
+            if actual_elapsed < expected_elapsed {
+                std::thread::sleep(expected_elapsed - actual_elapsed);
+            }
         }
 
         if let Some(ref pb) = pb {
