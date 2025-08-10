@@ -548,7 +548,7 @@ fn main() {
 
         let active_polyphony = multi_synth.get_polyphony();
         let max_polyphony = multi_synth.get_max_polyphony();
-        let synth_rendering_time = multi_synth.get_rendering_time_ratio() * 100.0;
+        let synth_rendering_time = multi_synth.get_rendering_time_ratio();
         let current_frames = if let Some(ref pb) = pb {
             pb.position()
         } else {
