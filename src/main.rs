@@ -1,11 +1,13 @@
 pub mod limiter;
 pub mod multi_synth;
+pub mod predefined_drum_samples;
 pub mod predefined_sample;
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use ksynth_core::{
     Channel,
+    drum_kit::DrumKit,
     sample::{Sample, SampleData},
 };
 use limiter::Limiter;
@@ -23,6 +25,12 @@ use midi_toolkit::{
     },
 };
 use multi_synth::MultiSynth;
+use predefined_drum_samples::{
+    generate_acoustic_bass_drum_sample, generate_crash_cymbal_sample,
+    generate_electric_snare_sample, generate_hand_clap_sample, generate_hihat_sample,
+    generate_kick_sample, generate_pedal_hihat_sample, generate_ride_cymbal_sample,
+    generate_side_stick_sample, generate_snare_sample,
+};
 use predefined_sample::generate_piano_sample;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rfd::FileDialog;
@@ -216,6 +224,7 @@ fn main() {
         eprintln!("creating_samples_hashmap");
     }
     let mut samples_map: HashMap<u8, Sample> = HashMap::with_capacity(128);
+    let mut drum_kit: Option<DrumKit> = None;
     if !headless {
         println!("Samples HashMap Created!");
         println!("Loading sample...");
@@ -293,25 +302,68 @@ fn main() {
             samples_map.insert(key, sample);
         }
     } else {
-        // Precalculate sample
+        // Precalculate piano samples
         let samples_vec: Vec<(u8, Sample)> = (0u8..128)
             .into_par_iter()
-            .map(|key| {
-                let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
-                let sample_count = (sample_rate as f32 * 10.0) as usize;
-
-                let sample_vec: Vec<i16> = generate_piano_sample(sample_rate, freq, sample_count);
-
-                let ksynth_sample_data = SampleData::Mono(sample_vec);
-                let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
-
-                (key, ksynth_sample)
+            .filter_map(|key| {
+                // Exclude drum notes from piano samples
+                if key == 36 || key == 38 || key == 42 || key == 46 {
+                    // Assuming these are drum notes
+                    None
+                } else {
+                    let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                    let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
+                    let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
+                    let ksynth_sample_data = SampleData::Mono(sample_vec);
+                    let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                    Some((key, ksynth_sample))
+                }
             })
             .collect();
 
         for (key, sample) in samples_vec {
             samples_map.insert(key, sample);
         }
+
+        // Precalculate drum samples for DrumKit
+        let mut drum_kit_map: HashMap<u8, Sample> = HashMap::new();
+        let drum_sample_count = (sample_rate as f32 * 2.0) as usize; // Default sample count for drums
+
+        // MIDI GS Drum Map
+        let drum_notes = [
+            35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+            57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78,
+            79, 80, 81, 82, 83, 84,
+        ];
+
+        for &key in &drum_notes {
+            let sample_vec: Vec<i16> = match key {
+                35 => generate_acoustic_bass_drum_sample(sample_rate, drum_sample_count),
+                36 => generate_kick_sample(sample_rate, drum_sample_count),
+                37 => generate_side_stick_sample(sample_rate, drum_sample_count / 2), // Side stick is short
+                38 => generate_snare_sample(sample_rate, drum_sample_count),
+                39 => generate_hand_clap_sample(sample_rate, drum_sample_count / 2), // Hand clap is short
+                40 => generate_electric_snare_sample(sample_rate, drum_sample_count),
+                41 => generate_kick_sample(sample_rate, drum_sample_count), // Low Floor Tom (using kick for now)
+                42 => generate_hihat_sample(sample_rate, drum_sample_count / 2), // Closed Hi-Hat
+                43 => generate_kick_sample(sample_rate, drum_sample_count), // High Floor Tom (using kick for now)
+                44 => generate_pedal_hihat_sample(sample_rate, drum_sample_count / 2), // Pedal Hi-Hat
+                45 => generate_kick_sample(sample_rate, drum_sample_count), // Low Tom (using kick for now)
+                46 => generate_hihat_sample(sample_rate, drum_sample_count), // Open Hi-Hat
+                47 => generate_kick_sample(sample_rate, drum_sample_count), // Low-Mid Tom (using kick for now)
+                48 => generate_kick_sample(sample_rate, drum_sample_count), // High-Mid Tom (using kick for now)
+                49 => generate_crash_cymbal_sample(sample_rate, drum_sample_count * 2), // Crash Cymbal (longer)
+                50 => generate_kick_sample(sample_rate, drum_sample_count), // High Tom (using kick for now)
+                51 => generate_ride_cymbal_sample(sample_rate, drum_sample_count * 3), // Ride Cymbal (longer)
+                // These will need proper implementation later.
+                _ => Vec::new()
+            };
+            let ksynth_sample_data = SampleData::Mono(sample_vec);
+            let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+            drum_kit_map.insert(key, ksynth_sample);
+        }
+
+        drum_kit = Some(DrumKit::new(drum_kit_map));
     }
 
     if !headless {
@@ -329,6 +381,7 @@ fn main() {
         max_polyphony as u32,
         ((sample_rate as f64) * 0.1) as u64,
         samples_arc,
+        drum_kit,
         if use_multithread { thread_count } else { 1 },
     );
     if !headless {
@@ -562,7 +615,9 @@ fn main() {
         }
 
         if max_render_speed > 0.0 {
-            let expected_elapsed = Duration::from_secs_f64(actual_rendered_frames as f64 / (sample_rate as f64 * max_render_speed));
+            let expected_elapsed = Duration::from_secs_f64(
+                actual_rendered_frames as f64 / (sample_rate as f64 * max_render_speed),
+            );
             let actual_elapsed = rendering_start_time.elapsed();
 
             if actual_elapsed < expected_elapsed {
