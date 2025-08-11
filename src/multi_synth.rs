@@ -153,6 +153,6 @@ impl MultiSynth {
     pub fn get_rendering_time_ratio(&self) -> f32 {
         let sum: f32 = self.synths.iter().map(|s| s.get_rendering_time()).sum();
         let count = self.synths.len();
-        if count == 0 { 0.0 } else { (sum / count as f32) * 100.0 }
+        if count == 0 { 0.0 } else { sum / count as f32 }
     }
 }
