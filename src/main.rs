@@ -80,7 +80,7 @@ struct Args {
     disable_limiter: bool,
 
     /// Maximum rendering speed (0.0 for no limit, values between 0.0 and 1.0 will be treated as 1.0, 1.0 for realtime, higher values for faster rendering)
-    #[arg(long, default_value_t = 1.0)]
+    #[arg(long, default_value_t = 0.0)]
     max_render_speed: f64,
 }
 
