@@ -25,13 +25,13 @@ use midi_toolkit::{
     },
 };
 use multi_synth::MultiSynth;
+use predefined_sample::generate_piano_sample;
 use predefined_drum_samples::{
     generate_acoustic_bass_drum_sample, generate_crash_cymbal_sample,
     generate_electric_snare_sample, generate_hand_clap_sample, generate_hihat_sample,
     generate_kick_sample, generate_pedal_hihat_sample, generate_ride_cymbal_sample,
     generate_side_stick_sample, generate_snare_sample,
 };
-use predefined_sample::generate_piano_sample;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rfd::FileDialog;
 use std::{

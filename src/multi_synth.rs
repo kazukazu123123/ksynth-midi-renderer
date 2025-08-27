@@ -5,6 +5,7 @@ use std::{
 
 use ksynth_core::{Channel, KSynth, drum_kit::DrumKit, sample::Sample};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use num_cpus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct NoteKey {
@@ -17,36 +18,44 @@ pub struct MultiSynth {
     note_map: HashMap<NoteKey, Vec<usize>>, // Note key -> list of instance indices
     note_counts: Vec<u32>,                  // Current number of simultaneous voices per instance
     max_voices: Vec<u32>,                   // Maximum number of simultaneous voices per instance
-    drum_synth_idx: Option<usize>,          // Index of the KSynth instance that holds the DrumKit
+    drum_kit_storage: Option<DrumKit>,
+    sample_rate: u32,
+    num_channel: Channel,
+    fade_out_sample: u64,
+    sample_map: Arc<RwLock<HashMap<u8, Sample>>>,
+    max_total_voices: u32,
 }
 
 impl MultiSynth {
-    pub fn new(
+    fn build_synths(
         sample_rate: u32,
         num_channel: Channel,
         max_total_voices: u32,
         fade_out_sample: u64,
         sample_map: Arc<RwLock<HashMap<u8, Sample>>>,
-        mut drum_kit: Option<DrumKit>, // Changed to mut Option<DrumKit>
-        num_instances: usize,
-    ) -> Self {
+        drum_kit: Option<DrumKit>,
+        mut num_instances: usize,
+    ) -> (Vec<KSynth>, Vec<u32>) {
+        let max_threads = num_cpus::get();
+        if num_instances > max_threads {
+            num_instances = max_threads;
+        }
+
         let base_voice_count = max_total_voices / num_instances as u32;
         let mut max_voices = vec![base_voice_count; num_instances];
-
         for i in 0..(max_total_voices % num_instances as u32) {
             max_voices[i as usize] += 1;
         }
 
-        let mut synths = Vec::with_capacity(num_instances);
+        let mut synths = Vec::new();
         let mut filtered_max_voices = Vec::new();
-        let mut drum_synth_idx: Option<usize> = None;
+
+        let drum_kit_cloned = drum_kit.clone();
 
         for (i, &voices) in max_voices.iter().enumerate() {
-            // Added enumerate
             if voices > 0 {
-                let current_drum_kit = if i == 0 {
-                    drum_synth_idx = Some(i); // Store the index
-                    drum_kit.take()
+                let current_drum_kit = if i == 0 && drum_kit_cloned.is_some() {
+                    drum_kit_cloned.clone()
                 } else {
                     None
                 };
@@ -62,6 +71,28 @@ impl MultiSynth {
             }
         }
 
+        (synths, filtered_max_voices)
+    }
+
+    pub fn new(
+        sample_rate: u32,
+        num_channel: Channel,
+        max_total_voices: u32,
+        fade_out_sample: u64,
+        sample_map: Arc<RwLock<HashMap<u8, Sample>>>,
+        drum_kit: Option<DrumKit>,
+        num_instances: usize,
+    ) -> Self {
+        let (synths, filtered_max_voices) = Self::build_synths(
+            sample_rate,
+            num_channel,
+            max_total_voices,
+            fade_out_sample,
+            sample_map.clone(),
+            drum_kit.clone(),
+            num_instances,
+        );
+
         let synth_len = synths.len();
 
         MultiSynth {
@@ -69,7 +100,12 @@ impl MultiSynth {
             note_map: HashMap::new(),
             note_counts: vec![0; synth_len],
             max_voices: filtered_max_voices,
-            drum_synth_idx, // Initialize drum_synth_idx
+            drum_kit_storage: drum_kit,
+            sample_rate,
+            num_channel,
+            fade_out_sample,
+            sample_map,
+            max_total_voices,
         }
     }
 
@@ -81,23 +117,20 @@ impl MultiSynth {
         let channel = status & 0x0F;
         let status_nibble = status & 0xF0;
 
-        // Check if it's a drum channel event (MIDI Channel 9 is 0x09)
-        if channel == 0x09 && self.drum_synth_idx.is_some() {
-            // Route drum events to the dedicated drum synth
-            let idx = self.drum_synth_idx.unwrap();
+        if channel == 0x09 && self.drum_kit_storage.is_some() {
+            let idx = 0;
             match status_nibble {
                 0x90 => {
                     if velocity == 0 {
-                        self.synths[idx].queue_midi_cmd(cmd); // Note off
+                        self.synths[idx].queue_midi_cmd(cmd);
                     } else {
-                        self.synths[idx].queue_midi_cmd(cmd); // Note on
+                        self.synths[idx].queue_midi_cmd(cmd);
                     }
                 }
-                0x80 => self.synths[idx].queue_midi_cmd(cmd), // Note off
-                _ => {} // Other MIDI messages for drum channel can be ignored or handled as needed
+                0x80 => self.synths[idx].queue_midi_cmd(cmd),
+                _ => {}
             }
         } else {
-            // For non-drum channels, use existing polyphony-based distribution
             match status_nibble {
                 0x90 => {
                     if velocity == 0 {
@@ -184,5 +217,45 @@ impl MultiSynth {
         let sum: f32 = self.synths.iter().map(|s| s.get_rendering_time()).sum();
         let count = self.synths.len();
         if count == 0 { 0.0 } else { sum / count as f32 }
+    }
+
+    pub fn set_max_polyphony(&mut self, max_total_voices: u32) {
+        self.max_total_voices = max_total_voices;
+
+        let (new_synths, new_max_voices) = Self::build_synths(
+            self.sample_rate,
+            self.num_channel,
+            max_total_voices,
+            self.fade_out_sample,
+            self.sample_map.clone(),
+            self.drum_kit_storage.clone(),
+            self.synths.len(),
+        );
+
+        self.synths = new_synths;
+        self.max_voices = new_max_voices;
+        self.note_map.clear();
+        self.note_counts = vec![0; self.synths.len()];
+    }
+
+    pub fn get_num_instances(&self) -> usize {
+        self.synths.len()
+    }
+
+    pub fn set_num_instances(&mut self, new_num_instances: usize) {
+        let (new_synths, new_max_voices) = Self::build_synths(
+            self.sample_rate,
+            self.num_channel,
+            self.max_total_voices,
+            self.fade_out_sample,
+            self.sample_map.clone(),
+            self.drum_kit_storage.clone(),
+            new_num_instances,
+        );
+
+        self.synths = new_synths;
+        self.max_voices = new_max_voices;
+        self.note_map.clear();
+        self.note_counts = vec![0; self.synths.len()];
     }
 }
