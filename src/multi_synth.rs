@@ -4,8 +4,8 @@ use std::{
 };
 
 use ksynth_core::{Channel, KSynth, drum_kit::DrumKit, sample::Sample};
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use num_cpus;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct NoteKey {
@@ -214,9 +214,10 @@ impl MultiSynth {
     }
 
     pub fn get_rendering_time_ratio(&self) -> f32 {
-        let sum: f32 = self.synths.iter().map(|s| s.get_rendering_time()).sum();
-        let count = self.synths.len();
-        if count == 0 { 0.0 } else { sum / count as f32 }
+        self.synths
+            .iter()
+            .map(|s| s.get_rendering_time())
+            .fold(0.0_f32, |max_val, t| t.max(max_val))
     }
 
     pub fn set_max_polyphony(&mut self, max_total_voices: u32) {
