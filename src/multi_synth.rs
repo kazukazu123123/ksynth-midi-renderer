@@ -15,9 +15,9 @@ struct NoteKey {
 
 pub struct MultiSynth {
     synths: Vec<KSynth>,
-    note_map: HashMap<NoteKey, Vec<usize>>, // Note key -> list of instance indices
-    note_counts: Vec<u32>,                  // Current number of simultaneous voices per instance
-    max_voices: Vec<u32>,                   // Maximum number of simultaneous voices per instance
+    note_map: HashMap<NoteKey, usize>, // Note key -> instance index
+    note_counts: Vec<u32>,             // Current number of simultaneous voices per instance
+    max_voices: Vec<u32>,              // Maximum number of simultaneous voices per instance
     drum_kit_storage: Option<DrumKit>,
     sample_rate: u32,
     num_channel: Channel,
@@ -39,6 +39,10 @@ impl MultiSynth {
         let max_threads = num_cpus::get();
         if num_instances > max_threads {
             num_instances = max_threads;
+        }
+
+        if num_instances == 0 {
+            num_instances = 1;
         }
 
         let base_voice_count = max_total_voices / num_instances as u32;
@@ -151,6 +155,16 @@ impl MultiSynth {
     }
 
     fn note_on(&mut self, channel: u8, note: u8, cmd: u32) {
+        let note_key = NoteKey { channel, note };
+
+        if let Some(&old_idx) = self.note_map.get(&note_key) {
+            let note_off_cmd = (0x80 | channel) as u32 | ((note as u32) << 8) | (0 << 16);
+            self.synths[old_idx].queue_midi_cmd(note_off_cmd);
+            if self.note_counts[old_idx] > 0 {
+                self.note_counts[old_idx] -= 1;
+            }
+        }
+
         if let Some((idx, _)) = self
             .note_counts
             .iter()
@@ -158,10 +172,8 @@ impl MultiSynth {
             .filter(|&(i, &count)| count < self.max_voices[i])
             .min_by_key(|&(_, &count)| count)
         {
-            let note_key = NoteKey { channel, note };
-
             self.synths[idx].queue_midi_cmd(cmd);
-            self.note_map.entry(note_key).or_default().push(idx);
+            self.note_map.insert(note_key, idx);
             self.note_counts[idx] += 1;
         }
     }
@@ -169,15 +181,10 @@ impl MultiSynth {
     fn note_off(&mut self, channel: u8, note: u8, cmd: u32) {
         let note_key = NoteKey { channel, note };
 
-        if let Some(indices) = self.note_map.get_mut(&note_key) {
-            if let Some(idx) = indices.pop() {
-                self.synths[idx].queue_midi_cmd(cmd);
-                if self.note_counts[idx] > 0 {
-                    self.note_counts[idx] -= 1;
-                }
-            }
-            if indices.is_empty() {
-                self.note_map.remove(&note_key);
+        if let Some(idx) = self.note_map.remove(&note_key) {
+            self.synths[idx].queue_midi_cmd(cmd);
+            if self.note_counts[idx] > 0 {
+                self.note_counts[idx] -= 1;
             }
         }
     }
@@ -223,6 +230,15 @@ impl MultiSynth {
     pub fn set_max_polyphony(&mut self, max_total_voices: u32) {
         self.max_total_voices = max_total_voices;
 
+        for (note_key, &idx) in &self.note_map {
+            let channel = note_key.channel;
+            let note = note_key.note;
+            let note_off_cmd = (0x80 | channel) as u32 | ((note as u32) << 8) | (0 << 16);
+            if idx < self.synths.len() {
+                self.synths[idx].queue_midi_cmd(note_off_cmd);
+            }
+        }
+
         let (new_synths, new_max_voices) = Self::build_synths(
             self.sample_rate,
             self.num_channel,
@@ -244,6 +260,15 @@ impl MultiSynth {
     }
 
     pub fn set_num_instances(&mut self, new_num_instances: usize) {
+        for (note_key, &idx) in &self.note_map {
+            let channel = note_key.channel;
+            let note = note_key.note;
+            let note_off_cmd = (0x80 | channel) as u32 | ((note as u32) << 8) | (0 << 16);
+            if idx < self.synths.len() {
+                self.synths[idx].queue_midi_cmd(note_off_cmd);
+            }
+        }
+
         let (new_synths, new_max_voices) = Self::build_synths(
             self.sample_rate,
             self.num_channel,
