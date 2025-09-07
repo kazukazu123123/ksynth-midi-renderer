@@ -111,7 +111,7 @@ pub fn generate_piano_sample(sample_rate: u32, freq: f32, sample_count: usize) -
                 * harmonic_attenuation
                 * harmonic_decay
                 * harmonic_boost
-                / 2.0;
+                / 4.0;
         }
 
         // Hammer noise
