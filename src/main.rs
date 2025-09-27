@@ -239,87 +239,192 @@ fn main() {
         } else {
             eprintln!("loading_samples_from_folder={}", path);
         }
-        let samples_vec: Vec<(u8, Sample)> = (0u8..128)
-            .into_par_iter()
-            .filter_map(|key| {
-                let sample_path = format!(
-                    "{}/{}",
-                    path,
-                    args.sample_format.replace("{key}", &key.to_string())
-                );
-                let file = std::fs::File::open(&sample_path).ok()?;
-                let mut reader = hound::WavReader::new(file).ok()?;
-                let spec = reader.spec();
-                let sample_rate = spec.sample_rate;
-                let channels = spec.channels;
+        let samples_vec: Vec<(u8, Sample)> = if !headless {
+            let pb = ProgressBar::new(128);
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{msg}\n[{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                )
+                .unwrap()
+                .progress_chars("##-"),
+            );
+            pb.set_message("Loading samples...");
+            let result = (0u8..128)
+                .into_par_iter()
+                .filter_map(|key| {
+                    pb.inc(1);
+                    let sample_path = format!(
+                        "{}/{}",
+                        path,
+                        args.sample_format.replace("{key}", &key.to_string())
+                    );
+                    let file = std::fs::File::open(&sample_path).ok()?;
+                    let mut reader = hound::WavReader::new(file).ok()?;
+                    let spec = reader.spec();
+                    let sample_rate = spec.sample_rate;
+                    let channels = spec.channels;
 
-                let sample_data = match (channels, spec.sample_format) {
-                    (1, hound::SampleFormat::Float) => {
-                        let samples = reader
-                            .samples::<f32>()
-                            .map(|s| s.unwrap() as i16)
-                            .collect::<Vec<_>>();
-                        SampleData::Mono(samples)
-                    }
-                    (1, hound::SampleFormat::Int) => {
-                        let samples = reader
-                            .samples::<i16>()
-                            .map(|s| s.unwrap())
-                            .collect::<Vec<_>>();
-                        SampleData::Mono(samples)
-                    }
-                    (2, hound::SampleFormat::Float) => {
-                        let samples = reader
-                            .samples::<f32>()
-                            .map(|s| s.unwrap() as i16)
-                            .collect::<Vec<_>>();
-                        let stereo_samples = samples
-                            .chunks_exact(2)
-                            .map(|chunk| (chunk[0], chunk[1]))
-                            .collect::<Vec<_>>();
-                        SampleData::Stereo(stereo_samples)
-                    }
-                    (2, hound::SampleFormat::Int) => {
-                        let samples = reader
-                            .samples::<i16>()
-                            .map(|s| s.unwrap())
-                            .collect::<Vec<_>>();
-                        let stereo_samples = samples
-                            .chunks_exact(2)
-                            .map(|chunk| (chunk[0], chunk[1]))
-                            .collect::<Vec<_>>();
-                        SampleData::Stereo(stereo_samples)
-                    }
-                    _ => return None,
-                };
+                    let sample_data = match (channels, spec.sample_format) {
+                        (1, hound::SampleFormat::Float) => {
+                            let samples = reader
+                                .samples::<f32>()
+                                .map(|s| s.unwrap() as i16)
+                                .collect::<Vec<_>>();
+                            SampleData::Mono(samples)
+                        }
+                        (1, hound::SampleFormat::Int) => {
+                            let samples = reader
+                                .samples::<i16>()
+                                .map(|s| s.unwrap())
+                                .collect::<Vec<_>>();
+                            SampleData::Mono(samples)
+                        }
+                        (2, hound::SampleFormat::Float) => {
+                            let samples = reader
+                                .samples::<f32>()
+                                .map(|s| s.unwrap() as i16)
+                                .collect::<Vec<_>>();
+                            let stereo_samples = samples
+                                .chunks_exact(2)
+                                .map(|chunk| (chunk[0], chunk[1]))
+                                .collect::<Vec<_>>();
+                            SampleData::Stereo(stereo_samples)
+                        }
+                        (2, hound::SampleFormat::Int) => {
+                            let samples = reader
+                                .samples::<i16>()
+                                .map(|s| s.unwrap())
+                                .collect::<Vec<_>>();
+                            let stereo_samples = samples
+                                .chunks_exact(2)
+                                .map(|chunk| (chunk[0], chunk[1]))
+                                .collect::<Vec<_>>();
+                            SampleData::Stereo(stereo_samples)
+                        }
+                        _ => return None,
+                    };
 
-                let sample = Sample::new(sample_rate as u32, sample_data, None);
-                Some((key, sample))
-            })
-            .collect();
+                    let sample = Sample::new(sample_rate as u32, sample_data, None);
+                    Some((key, sample))
+                })
+                .collect();
+            pb.finish_with_message("Samples loaded!");
+            result
+        } else {
+            (0u8..128)
+                .into_par_iter()
+                .filter_map(|key| {
+                    let sample_path = format!(
+                        "{}/{}",
+                        path,
+                        args.sample_format.replace("{key}", &key.to_string())
+                    );
+                    let file = std::fs::File::open(&sample_path).ok()?;
+                    let mut reader = hound::WavReader::new(file).ok()?;
+                    let spec = reader.spec();
+                    let sample_rate = spec.sample_rate;
+                    let channels = spec.channels;
+
+                    let sample_data = match (channels, spec.sample_format) {
+                        (1, hound::SampleFormat::Float) => {
+                            let samples = reader
+                                .samples::<f32>()
+                                .map(|s| s.unwrap() as i16)
+                                .collect::<Vec<_>>();
+                            SampleData::Mono(samples)
+                        }
+                        (1, hound::SampleFormat::Int) => {
+                            let samples = reader
+                                .samples::<i16>()
+                                .map(|s| s.unwrap())
+                                .collect::<Vec<_>>();
+                            SampleData::Mono(samples)
+                        }
+                        (2, hound::SampleFormat::Float) => {
+                            let samples = reader
+                                .samples::<f32>()
+                                .map(|s| s.unwrap() as i16)
+                                .collect::<Vec<_>>();
+                            let stereo_samples = samples
+                                .chunks_exact(2)
+                                .map(|chunk| (chunk[0], chunk[1]))
+                                .collect::<Vec<_>>();
+                            SampleData::Stereo(stereo_samples)
+                        }
+                        (2, hound::SampleFormat::Int) => {
+                            let samples = reader
+                                .samples::<i16>()
+                                .map(|s| s.unwrap())
+                                .collect::<Vec<_>>();
+                            let stereo_samples = samples
+                                .chunks_exact(2)
+                                .map(|chunk| (chunk[0], chunk[1]))
+                                .collect::<Vec<_>>();
+                            SampleData::Stereo(stereo_samples)
+                        }
+                        _ => return None,
+                    };
+
+                    let sample = Sample::new(sample_rate as u32, sample_data, None);
+                    Some((key, sample))
+                })
+                .collect()
+        };
 
         for (key, sample) in samples_vec {
             samples_map.insert(key, sample);
         }
     } else {
         // Precalculate piano samples
-        let samples_vec: Vec<(u8, Sample)> = (0u8..128)
-            .into_par_iter()
-            .filter_map(|key| {
-                // Exclude drum notes from piano samples
-                if key == 36 || key == 38 || key == 42 || key == 46 {
-                    // Assuming these are drum notes
-                    None
-                } else {
-                    let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
-                    let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
-                    let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
-                    let ksynth_sample_data = SampleData::Mono(sample_vec);
-                    let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
-                    Some((key, ksynth_sample))
-                }
-            })
-            .collect();
+        let samples_vec: Vec<(u8, Sample)> = if !headless {
+            let pb = ProgressBar::new(128);
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{msg}\n[{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                )
+                .unwrap()
+                .progress_chars("##-"),
+            );
+            pb.set_message("Generating piano samples...");
+            let result = (0u8..128)
+                .into_par_iter()
+                .filter_map(|key| {
+                    pb.inc(1);
+                    // Exclude drum notes from piano samples
+                    if key == 36 || key == 38 || key == 42 || key == 46 {
+                        // Assuming these are drum notes
+                        None
+                    } else {
+                        let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                        let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
+                        let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
+                        let ksynth_sample_data = SampleData::Mono(sample_vec);
+                        let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                        Some((key, ksynth_sample))
+                    }
+                })
+                .collect();
+            pb.finish_with_message("Piano samples generated!");
+            result
+        } else {
+            (0u8..128)
+                .into_par_iter()
+                .filter_map(|key| {
+                    // Exclude drum notes from piano samples
+                    if key == 36 || key == 38 || key == 42 || key == 46 {
+                        // Assuming these are drum notes
+                        None
+                    } else {
+                        let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                        let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
+                        let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
+                        let ksynth_sample_data = SampleData::Mono(sample_vec);
+                        let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                        Some((key, ksynth_sample))
+                    }
+                })
+                .collect()
+        };
 
         for (key, sample) in samples_vec {
             samples_map.insert(key, sample);
@@ -336,31 +441,71 @@ fn main() {
             79, 80, 81, 82, 83, 84,
         ];
 
-        for &key in &drum_notes {
-            let sample_vec: Vec<i16> = match key {
-                35 => generate_acoustic_bass_drum_sample(sample_rate, drum_sample_count),
-                36 => generate_kick_sample(sample_rate, drum_sample_count),
-                37 => generate_side_stick_sample(sample_rate, drum_sample_count / 2), // Side stick is short
-                38 => generate_snare_sample(sample_rate, drum_sample_count),
-                39 => generate_hand_clap_sample(sample_rate, drum_sample_count / 2), // Hand clap is short
-                40 => generate_electric_snare_sample(sample_rate, drum_sample_count),
-                41 => generate_kick_sample(sample_rate, drum_sample_count), // Low Floor Tom (using kick for now)
-                42 => generate_hihat_sample(sample_rate, drum_sample_count / 2), // Closed Hi-Hat
-                43 => generate_kick_sample(sample_rate, drum_sample_count), // High Floor Tom (using kick for now)
-                44 => generate_pedal_hihat_sample(sample_rate, drum_sample_count / 2), // Pedal Hi-Hat
-                45 => generate_kick_sample(sample_rate, drum_sample_count), // Low Tom (using kick for now)
-                46 => generate_hihat_sample(sample_rate, drum_sample_count), // Open Hi-Hat
-                47 => generate_kick_sample(sample_rate, drum_sample_count), // Low-Mid Tom (using kick for now)
-                48 => generate_kick_sample(sample_rate, drum_sample_count), // High-Mid Tom (using kick for now)
-                49 => generate_crash_cymbal_sample(sample_rate, drum_sample_count * 2), // Crash Cymbal (longer)
-                50 => generate_kick_sample(sample_rate, drum_sample_count), // High Tom (using kick for now)
-                51 => generate_ride_cymbal_sample(sample_rate, drum_sample_count * 3), // Ride Cymbal (longer)
-                // These will need proper implementation later.
-                _ => Vec::new()
-            };
-            let ksynth_sample_data = SampleData::Mono(sample_vec);
-            let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
-            drum_kit_map.insert(key, ksynth_sample);
+        if !headless {
+            let pb = ProgressBar::new(drum_notes.len() as u64);
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{msg}\n[{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                )
+                .unwrap()
+                .progress_chars("##-"),
+            );
+            pb.set_message("Generating drum samples...");
+            for &key in &drum_notes {
+                pb.inc(1);
+                let sample_vec: Vec<i16> = match key {
+                    35 => generate_acoustic_bass_drum_sample(sample_rate, drum_sample_count),
+                    36 => generate_kick_sample(sample_rate, drum_sample_count),
+                    37 => generate_side_stick_sample(sample_rate, drum_sample_count / 2), // Side stick is short
+                    38 => generate_snare_sample(sample_rate, drum_sample_count),
+                    39 => generate_hand_clap_sample(sample_rate, drum_sample_count / 2), // Hand clap is short
+                    40 => generate_electric_snare_sample(sample_rate, drum_sample_count),
+                    41 => generate_kick_sample(sample_rate, drum_sample_count), // Low Floor Tom (using kick for now)
+                    42 => generate_hihat_sample(sample_rate, drum_sample_count / 2), // Closed Hi-Hat
+                    43 => generate_kick_sample(sample_rate, drum_sample_count), // High Floor Tom (using kick for now)
+                    44 => generate_pedal_hihat_sample(sample_rate, drum_sample_count / 2), // Pedal Hi-Hat
+                    45 => generate_kick_sample(sample_rate, drum_sample_count), // Low Tom (using kick for now)
+                    46 => generate_hihat_sample(sample_rate, drum_sample_count), // Open Hi-Hat
+                    47 => generate_kick_sample(sample_rate, drum_sample_count), // Low-Mid Tom (using kick for now)
+                    48 => generate_kick_sample(sample_rate, drum_sample_count), // High-Mid Tom (using kick for now)
+                    49 => generate_crash_cymbal_sample(sample_rate, drum_sample_count * 2), // Crash Cymbal (longer)
+                    50 => generate_kick_sample(sample_rate, drum_sample_count), // High Tom (using kick for now)
+                    51 => generate_ride_cymbal_sample(sample_rate, drum_sample_count * 3), // Ride Cymbal (longer)
+                    // These will need proper implementation later.
+                    _ => Vec::new()
+                };
+                let ksynth_sample_data = SampleData::Mono(sample_vec);
+                let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                drum_kit_map.insert(key, ksynth_sample);
+            }
+            pb.finish_with_message("Drum samples generated!");
+        } else {
+            for &key in &drum_notes {
+                let sample_vec: Vec<i16> = match key {
+                    35 => generate_acoustic_bass_drum_sample(sample_rate, drum_sample_count),
+                    36 => generate_kick_sample(sample_rate, drum_sample_count),
+                    37 => generate_side_stick_sample(sample_rate, drum_sample_count / 2), // Side stick is short
+                    38 => generate_snare_sample(sample_rate, drum_sample_count),
+                    39 => generate_hand_clap_sample(sample_rate, drum_sample_count / 2), // Hand clap is short
+                    40 => generate_electric_snare_sample(sample_rate, drum_sample_count),
+                    41 => generate_kick_sample(sample_rate, drum_sample_count), // Low Floor Tom (using kick for now)
+                    42 => generate_hihat_sample(sample_rate, drum_sample_count / 2), // Closed Hi-Hat
+                    43 => generate_kick_sample(sample_rate, drum_sample_count), // High Floor Tom (using kick for now)
+                    44 => generate_pedal_hihat_sample(sample_rate, drum_sample_count / 2), // Pedal Hi-Hat
+                    45 => generate_kick_sample(sample_rate, drum_sample_count), // Low Tom (using kick for now)
+                    46 => generate_hihat_sample(sample_rate, drum_sample_count), // Open Hi-Hat
+                    47 => generate_kick_sample(sample_rate, drum_sample_count), // Low-Mid Tom (using kick for now)
+                    48 => generate_kick_sample(sample_rate, drum_sample_count), // High-Mid Tom (using kick for now)
+                    49 => generate_crash_cymbal_sample(sample_rate, drum_sample_count * 2), // Crash Cymbal (longer)
+                    50 => generate_kick_sample(sample_rate, drum_sample_count), // High Tom (using kick for now)
+                    51 => generate_ride_cymbal_sample(sample_rate, drum_sample_count * 3), // Ride Cymbal (longer)
+                    // These will need proper implementation later.
+                    _ => Vec::new()
+                };
+                let ksynth_sample_data = SampleData::Mono(sample_vec);
+                let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                drum_kit_map.insert(key, ksynth_sample);
+            }
         }
 
         drum_kit = Some(DrumKit::new(drum_kit_map));
