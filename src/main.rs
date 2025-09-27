@@ -51,7 +51,7 @@ struct Args {
     #[arg(short = 's', long)]
     sample_folder_path: Option<String>,
 
-    /// Format string for sample files (e.g. "SAMPLE_{key}.wav" or "{key}.wav") (default: "{key}.wav")
+    /// Format string for sample files (e.g. "SAMPLE_{key}.wav" or "{key}.wav")
     #[arg(short = 'f', long, default_value = "{key}.wav")]
     sample_format: String,
 
@@ -75,7 +75,7 @@ struct Args {
     #[arg(short = 'H', long)]
     headless: bool,
 
-    /// Log output interval in milliseconds for headless mode (default: 1000ms)
+    /// Log output interval in milliseconds for headless mode
     #[arg(long, default_value_t = 1000)]
     log_interval_ms: u64,
 
