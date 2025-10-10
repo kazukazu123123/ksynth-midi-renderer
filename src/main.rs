@@ -390,18 +390,12 @@ fn main() {
                 .into_par_iter()
                 .filter_map(|key| {
                     pb.inc(1);
-                    // Exclude drum notes from piano samples
-                    if key == 36 || key == 38 || key == 42 || key == 46 {
-                        // Assuming these are drum notes
-                        None
-                    } else {
-                        let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
-                        let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
-                        let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
-                        let ksynth_sample_data = SampleData::Mono(sample_vec);
-                        let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
-                        Some((key, ksynth_sample))
-                    }
+                    let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                    let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
+                    let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
+                    let ksynth_sample_data = SampleData::Mono(sample_vec);
+                    let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                    Some((key, ksynth_sample))
                 })
                 .collect();
             pb.finish_with_message("Piano samples generated!");
@@ -410,18 +404,12 @@ fn main() {
             (0u8..128)
                 .into_par_iter()
                 .filter_map(|key| {
-                    // Exclude drum notes from piano samples
-                    if key == 36 || key == 38 || key == 42 || key == 46 {
-                        // Assuming these are drum notes
-                        None
-                    } else {
-                        let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
-                        let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
-                        let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
-                        let ksynth_sample_data = SampleData::Mono(sample_vec);
-                        let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
-                        Some((key, ksynth_sample))
-                    }
+                    let freq = 440.0 * 2f32.powf((key as f32 - 69.0) / 12.0);
+                    let piano_sample_count = (sample_rate as f32 * 10.0) as usize;
+                    let sample_vec = generate_piano_sample(sample_rate, freq, piano_sample_count);
+                    let ksynth_sample_data = SampleData::Mono(sample_vec);
+                    let ksynth_sample = Sample::new(sample_rate as u32, ksynth_sample_data, None);
+                    Some((key, ksynth_sample))
                 })
                 .collect()
         };
