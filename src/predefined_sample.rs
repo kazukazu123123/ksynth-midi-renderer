@@ -136,7 +136,7 @@ pub fn generate_piano_sample(sample_rate: u32, freq: f32, sample_count: usize) -
             sample = sample * (1.0 - saturation_amount * 0.3) + distorted * saturation_amount * 0.3;
         }
 
-        let output_gain = if freq < 200.0 { 0.9 } else { 0.7 };
+        let output_gain = if freq < 200.0 { 0.7 } else { 0.6 };
 
         let scaled = (sample * i16::MAX as f32 * output_gain)
             .clamp(-i16::MAX as f32, i16::MAX as f32) as i16;
