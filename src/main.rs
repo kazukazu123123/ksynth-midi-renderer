@@ -87,7 +87,7 @@ struct Args {
     #[arg(long)]
     disable_limiter: bool,
 
-    /// Maximum rendering speed (0.0 for no limit, values between 0.0 and 1.0 will be treated as 1.0, 1.0 for realtime, higher values for faster rendering)
+    /// Maximum rendering speed. A value of `0.0` means no speed limit. Values between `0.0` and `1.0` (exclusive) represent fractional rendering speeds (e.g., `0.5` for half realtime speed). A value of `1.0` enables realtime rendering, and values greater than `1.0` allow for rendering faster than realtime.
     #[arg(long, default_value_t = 0.0)]
     max_render_speed: f64,
 }
@@ -152,11 +152,7 @@ fn main() {
     };
     let headless = args.headless;
     let earrape_noise_mode = args.earrape_noise_mode;
-    let max_render_speed = if args.max_render_speed > 0.0 && args.max_render_speed < 1.0 {
-        1.0
-    } else {
-        args.max_render_speed
-    };
+    let max_render_speed = args.max_render_speed;
 
     // ヘッドレスモードでMIDIファイルパスが指定されていない場合は早期エラー
     if headless && args.midi_file_path.is_none() {
